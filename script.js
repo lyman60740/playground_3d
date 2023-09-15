@@ -113,23 +113,70 @@ window.addEventListener("resize", function () {
   renderer.setSize(newWidth, newHeight);
 });
 
-document.querySelector("body").addEventListener("click", () => {
-  gsap.to(animationProps, {
-    cubeSpacing: 5,
-    cubeRotation: Math.PI,
-    duration: 5,
-    onUpdate: createOrMoveCubes,
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+let cubesAreApart = false;
+let currentBreathingAnimation = null;
+let interactionAnimation = null;
+
+function startBreathingAnimation() {
+  return gsap.to(animationProps, {
+    cubeSpacing: 1.1,
+    duration: 2.5,
+    yoyo: true,
+    repeat: -1, // pour une répétition infinie
     ease: "power1.inOut",
-    onComplete: function () {
-      gsap.to(animationProps, {
-        cubeSpacing: 1,
-        cubeRotation: 0,
-        duration: 5,
-        onUpdate: createOrMoveCubes,
-        ease: "power1.inOut",
-      });
-    },
+    onUpdate: createOrMoveCubes,
   });
-});
+}
+
+function stopBreathingAnimation() {
+  if (currentBreathingAnimation) {
+    currentBreathingAnimation.pause();
+  }
+}
+
+function onMouseMove(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+
+  if (intersects.length > 0 && !cubesAreApart) {
+    cubesAreApart = true;
+    stopBreathingAnimation();
+    if (interactionAnimation) interactionAnimation.kill();
+    interactionAnimation = gsap.to(animationProps, {
+      cubeSpacing: 1.5,
+      cubeRotation: 0,
+      duration: 6,
+      onUpdate: createOrMoveCubes,
+      ease: "elastic.out(1.2, 0.8)",
+      onComplete: () => {
+        currentBreathingAnimation = startBreathingAnimation();
+      },
+    });
+  } else if (!intersects.length && cubesAreApart) {
+    cubesAreApart = false;
+    stopBreathingAnimation();
+    if (interactionAnimation) interactionAnimation.kill();
+    interactionAnimation = gsap.to(animationProps, {
+      cubeSpacing: 1,
+      cubeRotation: 0,
+      duration: 1,
+      onUpdate: createOrMoveCubes,
+      ease: "power1.inOut",
+      onComplete: () => {
+        currentBreathingAnimation = startBreathingAnimation();
+      },
+    });
+  }
+}
+
+renderer.domElement.addEventListener("mousemove", onMouseMove);
+
+currentBreathingAnimation = startBreathingAnimation();
 
 animate();
